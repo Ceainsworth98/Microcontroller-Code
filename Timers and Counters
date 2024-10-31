@@ -1,0 +1,70 @@
+/*
+
+Lab4.c*
+Created: 9/20/2024 8:39:36 PM
+Author : Carissa Ainsworth
+
+*/
+
+#define F_CPU 16000000UL
+#include <avr/io.h>
+
+#define ON PORTB |= (1 << PORTB5)  // Turns on LED
+#define OFF PORTB &= ~(1 << PORTB5) // Turns off LED
+
+int main() 
+{
+	#define BUTTON (1 << PINB7) // Button Pin
+	#define LED (1 << PINB5)    // LED Pin
+
+	TCCR0A |= (1 << WGM01); // Set timer to CTC mode
+	TCCR0A |= (1 << COM0B1); // Clear OC0B on compare match, set at bottom
+	TCCR0B |= (1 << CS00) | (1 << CS02); // Set prescaler to 1024
+	//needs to be prescaler 1024 because testing 256 results in OCR0A needing to be 624 but that is not possible 
+
+	DDRB |= (1 << DDB5); // LED output
+	DDRB &= ~(1 << DDB7); // Button input
+	PORTB |= (1 << PORTB7); // Enable pull-up resistor for button
+
+	// Time period = ((OCR0A+1)Prescaler)/Fcpu -> OCR0A= ((Time period*Fcpu)/Prescalar)-1
+	// Time period =10ms, Prescaler = 1024, Fcpu = 16000000
+	OCR0A = 155; // Set top to 155 = 10ms (100% duty cycle)
+	
+	//Duty cycle = (OCR0B/OCR0A)*100 -> OCR0B=((Duty cycle)/100)OCR0A
+	//Duty cycle = 0, OCR0A = 155
+	OCR0B = 0; // Start with 0% duty cycle
+
+	while (1)
+	{
+		// Increase duty cycle if button is pressed and duty cycle is less than 100%
+		if (!(PINB & BUTTON) && (OCR0B < OCR0A))
+		{
+			OCR0B++; // Increase duty cycle
+		}
+		// Decrease duty cycle if button is released and duty cycle is greater than 0%
+		else if ((PINB & BUTTON) && (OCR0B > 0))
+		{
+			OCR0B--; // Decrease duty cycle
+		}
+
+		// LED control based on duty cycle
+		if (OCR0B > 0)
+		{
+			ON;
+		}
+		else
+		{
+			OFF;
+		}
+
+		// Wait for OCR0B compare match event to turn off LED
+		while (!(TIFR0 & (1 << OCF0B)));
+		TIFR0 |= (1 << OCF0B); // Reset compare match flag
+
+		OFF; // Turn off LED after compare match
+
+		// Wait for OCR0A compare match event (end of cycle)
+		while (!(TIFR0 & (1 << OCF0A)));
+		TIFR0 |= (1 << OCF0A); // Reset compare match flag
+	}
+}
