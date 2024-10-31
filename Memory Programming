@@ -1,0 +1,59 @@
+/*
+ * Lab 8.c
+ *
+ * Created: 6/25/2024 8:57:42 PM
+ * Author : Carissa Ainsworth
+ */ 
+
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/eeprom.h>
+#define LEDON PORTB |= (1<<PORTB5)
+#define LEDOFF PORTB &= ~(1<<PORTB5)
+
+
+void timer()
+{
+	//TIMER 0
+	OCR0A =155;
+	TCCR0A |= (1 << WGM01); // CTC mode
+	TCCR0B |= (1 << CS02) | (1 << CS00); // Start Timer0 prescaler 1024
+	TIMSK0 |= (1 << OCIE0A) |(1 << OCIE0B); // Enable Timer0 compare match A & B
+
+}
+
+uint8_t EEMEM address=0;
+uint8_t dutycycle;
+
+int main(void)
+{
+	DDRB |= (1<<PORTB5); //led output
+	timer(); 
+	dutycycle = eeprom_read_byte(&address); // Read duty cycle from EEPROM
+	dutycycle += 10; // Increment duty cycle by 10%
+
+	if (dutycycle >=100)
+	{
+		dutycycle = 0; // Reset duty cycle to 0 if it exceeds 100%
+	}
+	eeprom_update_byte(&address, dutycycle);
+	OCR0B = OCR0A *((float)dutycycle / 100.00);
+	sei();
+    while (1) 
+    {}
+}
+
+ISR (TIMER0_COMPA_vect)
+{
+	if (dutycycle != 0) // Check if dutycycle is not zero
+	{
+		LEDON; // Turn on LED
+	}
+
+}
+
+ISR(TIMER0_COMPB_vect)
+{
+	LEDOFF;//LED OFF
+}
+
