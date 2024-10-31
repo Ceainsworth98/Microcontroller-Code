@@ -1,0 +1,81 @@
+/*
+
+Lab5.c*
+Created: 10/04/2024 9:39:36 PM
+Author : Carissa Ainsworth
+
+*/
+
+#define F_CPU 16000000UL
+#include <avr/io.h>
+#include <util/delay.h>
+
+int freq[4][4] =
+{
+	{227, 214, 202, 191},
+	{180, 170, 160, 151},
+	{143, 135, 127, 120},
+	{113, 107, 101, 95}      // Decreased frequencies for keys 'D' to 'F'
+};
+
+void setup(void)
+{
+	//set pins
+	DDRD |= (1<<DDD4) | (1<<DDD5) | (1<<DDD6) | (1<<DDD7); //output
+	DDRB &= ~(1<<DDB0) & ~(1<<DDB1) & ~(1<<DDB2) & ~(1<<DDB3); //input
+	DDRC |= (1<<4) | (1<<5); //audio output pins
+
+	//ports set high
+	PORTB |= (1<<PORTB0) | (1<<PORTB1) | (1<<PORTB2) | (1<<PORTB3); // B0-B3
+	PORTD |= (1<< PORTD4) | (1<< PORTD5) | (1<<PORTD6) | (1<<PORTD7); //D4-D7]
+
+	TCCR2A |= (1 << WGM21) | (1 << WGM20);  //set timer to Fast PWM mode
+	TCCR2B |= (1 << WGM22); //continue setting Fast PWM mode
+	TCCR2A |= (1 << COM2B1); //clear OC2B on compare match
+	TCCR2B |= (1 << CS21) | (1 << CS22);
+}
+
+
+void audio(int freq)
+{
+	OCR2A = freq; // Set OCR2A to generate the desired frequency
+	OCR2B = freq/2;// volume control 
+
+	PORTC |= (1 << 4) | (1 << 5); // Turn on audio output
+	
+	while (!(TIFR2 & (1 << OCF2B))); //wait for compare match on OCR2B
+	TIFR2 |= (1 << OCF2B);  //clear the compare match flag
+	PORTC &= ~(1 << 4) & ~(1 << 5);  //disable audio output
+	
+	while (!(TIFR2 & (1 << OCF2A)));// wait for compare match on OCR2A
+	TIFR2 |= (1 << OCF2A); 
+}
+
+
+void scan_keypad()
+{
+	for (int i = 0; i<4; i++)// Check rows PD4-PD7
+	{
+		PORTD &= ~ (1 <<(i + 4)); //set row to low
+		
+		for (int j = 0; j < 4; j++)// Check columns PB0-PB3
+		{ 
+			while (!(PINB & (1 << j)))// button pressed
+			{
+				audio(freq[i][j]); // Play frequency
+			}
+				OCR2A = 0;   //reset the timer to stop sound
+				OCR2B = 0;
+		}
+		PORTD |=(1 << (i+4));// current row high
+	}
+}
+
+int main(void)
+{
+	setup();
+	while (1)
+	{
+		scan_keypad(); //Scans keypad and sets musical frequency according to button
+	}
+}
