@@ -1,0 +1,58 @@
+/*
+Lab2.c
+Created: 9/13/2024 04:43:45 PM
+Author : Carissa Ainsworth
+*/
+
+#define F_CPU 16000000UL //16MHz clock frequency
+#define BAUD_RATE 9600 //needs to match system 
+
+#include <avr/io.h>
+#include <util/delay.h>
+
+void set_USART(unsigned int b_rate);
+void tstr_USART(unsigned char str[11]);
+unsigned char RED_ID[11] = {'8','2','8','2','0','2','8','5','0','\n','\r'};
+
+int main(void)
+{
+    set_USART(F_CPU/(16UL*(BAUD_RATE))-1); // Initialize USART with baud rate 9600
+    // equation
+    // system clock frequency is 16MHz
+    // BAUD_Rate = 9600
+    // asynchronous normal mode
+
+
+    while (1) 
+    {
+        tstr_USART(RED_ID); //Run string of Red ID
+        _delay_ms(500); // Delay for 500ms
+    }
+}
+
+//Set USART to initiate 
+void set_USART(unsigned int b_rate)
+{
+    //set b_rate
+    UBRR0H = (unsigned char)(b_rate>>8);//Baud rate register high 8 bit 
+    UBRR0L = (unsigned char)b_rate;//Baud rate register low 8 bit, set baudrate
+
+    //receive and transmit 
+    UCSR0B = (1<<RXEN0)|(1<<TXEN0);//Enable receiver and transmitter
+
+    //8 data bit, 1 stop bit format 
+    UCSR0C = (1<<UCSZ01)|(1<<UCSZ00);//8 bit data format
+}
+
+//Transmit string to USART
+void tstr_USART(unsigned char str[])
+{
+    //str= string 
+    int i=0;
+    while (str[i] != '\0')
+    {
+        while (!(UCSR0A & (1<<UDRE0)));
+        UDR0 = str[i]; //data to buffer, send
+        i++;
+    }
+}
