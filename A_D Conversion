@@ -1,0 +1,75 @@
+/* 
+ * Created: 6/20/2024 9:56:39 PM
+ * Author: Carissa Ainsworth
+ * RedID = 828202850
+ 
+ * XYZ = 850
+ * Timer 0 = (8+1) = 9ms
+ * Cycle freq = (Z+1)*100 = (0+1)*100 = 1*100 = 100Hz = 1/100 = 0.01 ms
+ * OCR0A = 1/(16*10^6) * (2^8)*1024 = 0.016384->16.384* ((1024*9)/16.384)-1 = 139.62 ->140
+ * pval=1024
+ */ 
+#include <avr/io.h>
+#include <avr/interrupt.h>
+
+#define F_CPU 16000000UL // Example CPU frequency
+
+
+//uint16_t adcValue = 0;
+
+void timer_init();
+void adc_init();
+
+int main(void)
+{
+	DDRB |= (1 << DDB5); // LED as output
+	DDRC &= ~(1 << DDC5); // Setting input
+    timer_init();
+    adc_init();
+
+    sei(); // Enable global interrupts
+
+    while (1);
+}
+
+void timer_init()
+{
+    // Timer0 configuration for interrupt period
+    OCR0A = 140; // Set OCR0A for 9 ms interrupt period
+    TCCR0A |= (1 << WGM01); // CTC mode
+    TCCR0B |= (1 << CS02) | (1 << CS00); // Start Timer0 prescaler 1024
+    TIMSK0 |= (1 << OCIE0A); // Enable Timer0 compare match A interrupt
+	
+    // Timer2 configuration for PWM generation
+    OCR2A = 156; // Set OCR2A as TOP value for 8-bit PWM
+    TCCR2A |= (1 << WGM21); // CTC mode for Timer2
+    TCCR2B |= (1 << CS22) | (1 << CS21) | (1 << CS20); // Start Timer2 prescaler 1024
+    TIMSK2 |= (1 << OCIE2A) | (1 << OCIE2B); // Enable Timer2 compare match A interrupt
+}
+
+void adc_init()
+{
+   // uint16_t Y = 5; // Last digit of Red ID
+   // uint8_t adc_channel = Y % 6 then adc_channel is 5
+
+	ADMUX |= (1 << REFS0) | (1 << MUX2) | (1 << MUX0);
+	ADMUX &= ~(1 << REFS1) & ~(1 << ADLAR) & ~(1 << MUX3) & ~(1 << MUX1);
+	ADCSRA = (1 << ADEN) | (1 << ADATE) | (1 << ADIE) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Enable ADC, start conversion, enable interrupt, set prescale
+    ADCSRB |= (1 << ADTS1) | (1 << ADTS0); // Auto Trigger Source ADC converts @ Compare Match A Timer0  
+}
+
+ISR(ADC_vect)
+{
+    uint16_t adcValue = ADC; // Read ADC value
+    OCR2B = OCR2A * (adcValue / 1024.0); // Set PWM duty cycle based on ADC value
+}
+
+ISR(TIMER2_COMPA_vect)
+{
+    PORTB |= (1 << PORTB5); // Toggle PORTB5 (LED ON)
+}
+
+ISR(TIMER2_COMPB_vect)
+{
+    PORTB &= ~(1 << PORTB5); // Toggle PORTB5 (LED OFF)
+}
